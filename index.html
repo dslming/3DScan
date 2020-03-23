@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <link rel="stylesheet" href="css/materialize.min.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+  <div class="navcontrols">
+
+    <div class="leftside panel">
+      <ul>
+        <li class="active">
+          <img src="icons/walk.png" alt="">
+        </li>
+        <li>
+          <img src="icons/mesh.png" alt="">
+        </li>
+        <li>
+          <img src="icons/floorplan.png" alt="">
+        </li>
+        <li>
+          <img src="icons/birdseyeview.png" alt="">
+        </li>
+      </ul>
+    </div>
+    <div class="rightside panel">
+      <ul>
+        <li>
+          <img src="icons/save.png" alt="">
+        </li>
+        <li>
+          <img src="icons/measure.png" alt="">
+        </li>
+        <li>
+          <img src="icons/marquee.png" alt="">
+        </li>
+        <li class="active">
+          <img src="icons/cursorshapes.png" alt="">
+        </li>
+        <li>
+          <input type="color">
+        </li>
+      </ul>
+    </div>
+
+  </div>
+
+  <script src="js/TweenMax.min.js"></script>
+  <script src="js/jquery-3.2.1.min.js"></script>
+  <script src="js/materialize.min.js"></script>
+  <script type="module" src="js/main.js"></script>
+  <script src="js/controls.js"></script>
+  <script id="fragmentShader" type="x-shader/x-fragment">
+
+		precision highp float;
+precision highp int;
+
+uniform mat4 viewMatrix;
+uniform vec3 cameraPosition;
+// Sweep transitions
+uniform float progress;
+
+// gradient colorings
+uniform vec3 topColor;
+uniform vec3 bottomColor;
+uniform float gradientOpacity;
+uniform float radius;
+varying vec4 worldPosition;
+
+// projected panos
+uniform vec3 pano0Position;
+uniform vec3 pano1Position;
+uniform samplerCube pano0Map;
+uniform samplerCube pano1Map;
+varying vec3 vWorldPosition0;
+varying vec3 vWorldPosition1;
+
+// Mixed in Linear color spaces based off of https://www.shadertoy.com/view/lscGDr
+#define SRGB_TO_LINEAR(c) pow((c), vec3(2.2))
+#define LINEAR_TO_SRGB(c) pow((c), vec3(1.0 / 2.2))
+#define USE_DITHER
+
+// Gradient noise from Jorge Jimenez's presentation:
+// http://www.iryoku.com/next-generation-post-processing-in-call-of-duty-advanced-warfare
+float gradientNoise(in vec2 uv) {
+  const vec3 magic = vec3(0.06711056, 0.00583715, 52.9829189);
+  return fract(magic.z * fract(dot(uv, magic.xy)));
+}
+
+void main() {
+  vec3 colorFromPano0 = textureCube(pano0Map, vWorldPosition0.xyz).rgb;
+  vec3 colorFromPano1 = textureCube(pano1Map, vWorldPosition1.xyz).rgb;
+
+  float normalizedHeight = (worldPosition.y + radius) / (radius * 2.0);
+  float ratio = smoothstep(0.0, 0.5, normalizedHeight);
+
+  vec3 colorFromGradient = mix(SRGB_TO_LINEAR(bottomColor), SRGB_TO_LINEAR(topColor), ratio);
+
+  vec3 colorFromPanos = mix(colorFromPano0, colorFromPano1, progress);
+  vec3 color = mix(colorFromPanos, LINEAR_TO_SRGB(colorFromGradient), gradientOpacity);
+
+  #if defined (USE_DITHER)
+    color += (1.0/255.0) * gradientNoise(gl_FragCoord.xy) - (0.5/255.0);
+  #endif
+
+  gl_FragColor = vec4(color, 1.0);
+}
+		</script>
+
+
+
+  <script id="vertexShader" type="x-shader/x-vertex">
+
+		precision highp float;
+precision highp int;
+
+uniform mat4 modelMatrix;
+uniform mat4 modelViewMatrix;
+uniform mat4 projectionMatrix;
+uniform mat4 viewMatrix;
+uniform mat3 normalMatrix;
+uniform vec3 cameraPosition;
+attribute vec3 position;
+attribute vec3 normal;
+attribute vec2 uv;
+uniform vec3 pano0Position;
+uniform mat4 pano0Matrix;
+
+uniform vec3 pano1Position;
+uniform mat4 pano1Matrix;
+
+varying vec3 vWorldPosition0;
+varying vec3 vWorldPosition1;
+varying vec4 worldPosition;
+
+void main() {
+  worldPosition = modelMatrix * vec4(position, 1.0);
+  vec3 positionLocalToPanoCenter0 = worldPosition.xyz - pano0Position;
+  vWorldPosition0 = (vec4(positionLocalToPanoCenter0, 1.0) * pano0Matrix).xyz;
+  vWorldPosition0.x *= -1.0;
+
+  vec3 positionLocalToPanoCenter1 = worldPosition.xyz - pano1Position;
+  vWorldPosition1 = (vec4(positionLocalToPanoCenter1, 1.0) * pano1Matrix).xyz;
+  vWorldPosition1.x *= -1.0;
+
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+
+}
+
+		</script>
+
+</body>
+
+</html>
