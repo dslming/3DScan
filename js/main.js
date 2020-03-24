@@ -125,7 +125,7 @@ function init() {
         },
         gradientOpacity: {
             type: "f",
-            value: .8
+            value: 0
         },
         topColor: {
             type: "v3",
