@@ -13,21 +13,31 @@
 
   <div class="navcontrols">
 
+
     <div class="leftside panel">
       <ul>
         <li class="active">
-          <img src="icons/walk.png" alt="">
+          <img id="walk" src="icons/walk.png" alt="">
         </li>
         <li>
-          <img src="icons/mesh.png" alt="">
+          <img id="mesh" src="icons/mesh.png" alt="">
         </li>
         <li>
-          <img src="icons/floorplan.png" alt="">
+          <img id="floorplan" src="icons/floorplan.png" alt="">
         </li>
         <li>
-          <img src="icons/birdseyeview.png" alt="">
+          <img id="birdview" src="icons/birdseyeview.png" alt="">
         </li>
+        <li>
+          <img class='dropdown-trigger' src="icons/floor selector.png" alt="" data-target='dropdown1'>
+          <ul id='dropdown1' class='dropdown-content'>
+            <li><a id="floor1" href="#!">floor 1</a></li>
+            <li><a id="floor2" href="#!">floor 2</a></li>
+          </ul>
+        </li>
+
       </ul>
+
     </div>
     <div class="rightside panel">
       <ul>

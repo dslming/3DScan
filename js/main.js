@@ -23,7 +23,12 @@ var raycaster = new THREE.Raycaster();
 var textureSwap = true;
 var torusMouse;
 var meshraycaster = new THREE.Raycaster();
-
+var meshMats = [];
+var orbitControls;
+var state = 'walk';
+var clippingPlane;
+var point;
+var idlePoint;
 
 init();
 animate();
@@ -34,7 +39,7 @@ function init() {
     document.body.appendChild(container);
 
 
-
+    clippingPlane = new THREE.Plane(new THREE.Vector3(0, - 1, 0), 0.5);
 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, .001, 5000);
 
@@ -63,7 +68,7 @@ function init() {
     renderer.setSize(window.innerWidth, window.innerHeight);
     container.appendChild(renderer.domElement);
 
-    var orbitControls = new OrbitControls(camera, renderer.domElement);
+    orbitControls = new OrbitControls(camera, renderer.domElement);
 
     orbitControls.minDistance = .001;
     orbitControls.maxDistance = .001;
@@ -153,7 +158,7 @@ function init() {
     var ambientLight = new THREE.AmbientLight(0xcccccc, 0.4);
     scene.add(ambientLight);
 
-    var pointLight = new THREE.PointLight(0xffffff, 0.8);
+    var pointLight = new THREE.PointLight(0xffffff, 1);
 
     dummyObject = new THREE.Object3D();
 
@@ -178,6 +183,7 @@ function init() {
 
     window.addEventListener('mousedown', onmousedown, false);
     document.addEventListener('mousemove', onDocumentMouseMove, false);
+    window.addEventListener('mouseup', onmouseup, false);
 
     function onDocumentMouseMove(e) {
         // event.preventDefault();
@@ -188,13 +194,47 @@ function init() {
 
     }
 
+    function onmouseup(e) {
+        if (idlePoint.distanceTo(point) < .01) {
+            var temp = [];
 
+            for (let index = 0; index < dummyObject.children.length; index++) {
+                const element = dummyObject.children[index];
+
+                temp.push(element.position.distanceTo(point));
+
+            }
+
+            currentSweep = sweeps[temp.indexOf(Math.min.apply(null, temp))]
+            moveToSweep();
+
+        }
+    }
 
     function onmousedown(e) {
         // e.preventDefault();
 
-        if (INTERSECTED)
-            moveToSweep();
+        if (INTERSECTED) {
+            currentSweep = sweeps[parseInt(INTERSECTED.name.replace('sweeps', ''))];
+
+            switch (state) {
+                case 'walk':
+                    moveToSweep();
+                    break;
+                case 'birdview':
+                    TweenMax.to(camera.position, 1.5, { x: currentSweep.position.x, y: currentSweep.position.z, z: -currentSweep.position.y })
+                    break;
+
+                default:
+                    break;
+            }
+        } else {
+
+            idlePoint = point;
+
+
+        }
+
     }
 
 
@@ -207,7 +247,7 @@ function init() {
                 if (data) {
                     for (let index = 0; index < data.length; index++) {
                         const element = data[index];
-                        var clone = new THREE.Mesh(new THREE.CylinderGeometry(.2,.2,.01), new THREE.MeshBasicMaterial({transparent:true,opacity:.5}));
+                        var clone = new THREE.Mesh(new THREE.CylinderGeometry(.2, .2, .01), new THREE.MeshBasicMaterial({ transparent: true, opacity: .5 }));
                         clone.position.set(element.floor_position.x, element.floor_position.z, -element.floor_position.y);
                         clone.name = 'sweeps' + index;
                         dummyObject.add(clone);
@@ -222,6 +262,7 @@ function init() {
     }
 
     function moveToSweep() {
+
 
         var texture = new THREE.CubeTextureLoader()
             .setPath('tex/' + currentSweep.sweep_uuid.replace(/-/g, '') + '/')
@@ -239,6 +280,7 @@ function init() {
         sphereMat.uniforms['pano' + (textureSwap ? 1 : 0) + 'Map'].value = texture;
         sphereMat.uniforms['pano' + (textureSwap ? 1 : 0) + 'Matrix'].value.compose(currentSweep.position, fromVisionQuaternion(currentSweep.rotation), { x: 1, y: 1, z: 1 });
 
+        orbitControls.maxDistance = 22;
 
         TweenMax.to(camera.position, 1.5, { x: currentSweep.position.x, y: currentSweep.position.z, z: -currentSweep.position.y })
 
@@ -247,11 +289,9 @@ function init() {
 
 
 
-
         setTimeout(() => {
-            orbitControls.target0.set(currentSweep.position.x, currentSweep.position.z, -currentSweep.position.y);
-            orbitControls.reset();
-
+            orbitControls.target.copy(camera.position);
+            orbitControls.maxDistance = .001;
             textureSwap = !textureSwap;
 
         }, 1600);
@@ -272,6 +312,8 @@ function init() {
     matLoader.load('models/building.mtl', mats => {
         mats.preload();
 
+
+
         loader.setMaterials(mats).load('models/building.obj', function (obj) {
 
             object = obj;
@@ -280,14 +322,15 @@ function init() {
                 if (mesh instanceof THREE.Mesh) {
                     mesh.material.transparent = true;
                     mesh.material.opacity = 0;
+                    mesh.material.clippingPlanes = [clippingPlane]
+
+                    meshMats.push(mesh.material);
                 }
             })
 
 
             object.rotation.set(Math.PI / 2, Math.PI, Math.PI);
             scene.add(object);
-
-            // scene.add(boundingBox);
             getSweepData();
 
 
@@ -296,23 +339,102 @@ function init() {
 
 
 
-    //
-
     window.addEventListener('resize', onWindowResize, false);
 
+    function onWindowResize() {
+
+        windowHalfX = window.innerWidth / 2;
+        windowHalfY = window.innerHeight / 2;
+
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+
+        renderer.setSize(window.innerWidth, window.innerHeight);
+
+    }
+
+    //listeners
+
+    $('#floor1').click(() => {
+        renderer.localClippingEnabled = true;
+    });
+
+    $('#floor2').click(() => {
+        renderer.localClippingEnabled = false;
+    });
+    $('#walk').click(() => {
+        state = 'walk';
+        orbitControls.enablePan = false;
+        orbitControls.enableZoom = false;
+        orbitControls.maxDistance = .001;
+        orbitControls.enableRotate = true;
+        dummyObject.visible = true;
+        for (let index = 0; index < meshMats.length; index++) {
+            const element = meshMats[index];
+            element.opacity = 0;
+        }
+        sphere.visible = true;
+        moveToSweep();
+
+    });
+    $('#mesh').click(() => {
+        state = 'walk';
+        orbitControls.enablePan = false;
+        orbitControls.enableZoom = false;
+        orbitControls.maxDistance = .001;
+        orbitControls.enableRotate = true;
+        dummyObject.visible = true;
+        for (let index = 0; index < meshMats.length; index++) {
+            const element = meshMats[index];
+            element.opacity = 1;
+        }
+        sphere.visible = false;
+        moveToSweep();
+
+    });
+
+
+
+    $('#floorplan').click(() => {
+
+        state = 'floorplan';
+        dummyObject.visible = false;
+        changeCamBehaviour();
+        orbitControls.target.copy({ x: 0, y: 0, z: 0 });
+        orbitControls.enableRotate = false;
+        TweenMax.to(camera.position, 1.5,
+            { x: 0, y: 20, z: 0 }
+        );
+
+    });
+
+    function changeCamBehaviour() {
+        orbitControls.enablePan = true;
+        orbitControls.enableZoom = true;
+        orbitControls.maxDistance = 33;
+        sphere.visible = false;
+        for (let index = 0; index < meshMats.length; index++) {
+            const element = meshMats[index];
+            element.opacity = 1;
+        }
+    }
+
+    $('#birdview').click(() => {
+        state = 'birdview'
+        dummyObject.visible = false;
+        orbitControls.enableRotate = true;
+
+        changeCamBehaviour();
+
+        orbitControls.target.copy({ x: 0, y: 0, z: 0 });
+        TweenMax.to(camera.position, 1.5, { x: 11.678532561315652, y: 0.934736735869917, z: 8.169341739020679 });
+
+
+    })
+
 }
 
-function onWindowResize() {
 
-    windowHalfX = window.innerWidth / 2;
-    windowHalfY = window.innerHeight / 2;
-
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-
-    renderer.setSize(window.innerWidth, window.innerHeight);
-
-}
 
 function animate() {
 
@@ -335,7 +457,7 @@ function render() {
 
                 MESHINTERSECTED = meshintersects[0];
 
-                var point = MESHINTERSECTED.point;
+                point = MESHINTERSECTED.point;
                 var normal = MESHINTERSECTED.face.normal.clone();
 
                 normal.transformDirection(object.matrixWorld);
@@ -370,7 +492,6 @@ function render() {
             INTERSECTED = intersects[0].object;
             INTERSECTED.currentHex = INTERSECTED.material.color.getHex();
             INTERSECTED.material.color.setHex(0xff0000);
-            currentSweep = sweeps[parseInt(INTERSECTED.name.replace('sweeps', ''))];
 
 
         }
@@ -382,7 +503,8 @@ function render() {
         INTERSECTED = null;
 
     }
-
+    if (state != 'walk')
+        orbitControls.update();
     renderer.render(scene, camera);
 
 }

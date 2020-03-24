@@ -1,5 +1,6 @@
 body {
   background-color: grey;
+  overflow: hidden;
 }
 
 .navcontrols{
@@ -18,15 +19,16 @@ z-index: 99;
 }
 
 .panel ul {
-  display: flex;
+  /* display: block; */
   width: auto;
   align-items: center;
 }
 
 .panel ul li {
+  display: inline-block;
   padding: 5px;
-  transition: all 1s;
-  opacity: .3;
+  transition: all .5s;
+  opacity: .5;
 
 }
 
@@ -38,11 +40,11 @@ z-index: 99;
 .panel ul li:hover{
   cursor: pointer;
   opacity: 1;
-  transform: scale(1.2);
 }
 
 .panel ul li.active{
   opacity: 1;
-  transform: scale(1.2);
+  border: rgba(0, 0, 0, 0.233) solid 3px;
+  border-radius: 12px;
 
 }
