@@ -42,23 +42,38 @@
     <div class="rightside panel">
       <ul>
         <li>
-          <img src="icons/save.png" alt="">
+          <img id="save" src="icons/save.png" alt="">
         </li>
         <li>
-          <img src="icons/measure.png" alt="">
+          <img id="measure" src="icons/measure.png" alt="">
         </li>
         <li>
-          <img src="icons/marquee.png" alt="">
+          <img id="marquee" src="icons/marquee.png" alt="">
         </li>
         <li class="active">
           <img src="icons/cursorshapes.png" alt="">
         </li>
         <li>
-          <input type="color">
+          <input id="candyColor" type="color" value="#fff000">
         </li>
       </ul>
     </div>
 
+  </div>
+
+  <div id="modal1" class="modal">
+    <div class="modal-content">
+      <h4>Pin Details</h4>
+      <p>Enter Informaiton</p>
+      <div class="input-field">
+        <input id="lollipopInfo" type="text" class="validate">
+        <label for="lollipopInfo">info</label>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <a href="#!" id="modal-close" class="modal-close waves-effect waves-green btn-flat">close</a>
+    </div>
   </div>
 
   <script src="js/TweenMax.min.js"></script>

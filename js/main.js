@@ -2,11 +2,11 @@ import * as THREE from './three.module.js';
 import { OBJLoader } from './OBJLoader.js';
 import { OrbitControls } from './OrbitControls.js';
 import { MTLLoader } from './MTLLoader.js';
+import { CSS2DRenderer, CSS2DObject } from './CSS2DRenderer.js';
+
 
 var container;
-
 var camera, scene, renderer;
-
 var windowHalfX = window.innerWidth / 2;
 var windowHalfY = window.innerHeight / 2;
 
@@ -29,6 +29,15 @@ var state = 'walk';
 var clippingPlane;
 var point;
 var idlePoint;
+var points = [];
+var line;
+var overlayDiv = document.createElement('div');
+var labelRenderer = new CSS2DRenderer();
+var overlayLabel = new CSS2DObject(overlayDiv);
+var lollipop;
+var lollipops = [];
+var isModalOpen = true;
+
 
 init();
 animate();
@@ -68,7 +77,7 @@ function init() {
     renderer.setSize(window.innerWidth, window.innerHeight);
     container.appendChild(renderer.domElement);
 
-    orbitControls = new OrbitControls(camera, renderer.domElement);
+    orbitControls = new OrbitControls(camera, labelRenderer.domElement);
 
     orbitControls.minDistance = .001;
     orbitControls.maxDistance = .001;
@@ -79,7 +88,10 @@ function init() {
 
     torusMouse = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.01, 16, 100), new THREE.MeshBasicMaterial({ color: 0xffff00 }))
 
-
+    labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    labelRenderer.domElement.style.position = 'absolute';
+    labelRenderer.domElement.style.top = 0;
+    document.body.appendChild(labelRenderer.domElement);
 
     sphereGeo = new THREE.SphereGeometry(3500, 24, 24);
     var uniforms2 = {
@@ -113,7 +125,7 @@ function init() {
         },
         gradientOpacity: {
             type: "f",
-            value: 0
+            value: .8
         },
         topColor: {
             type: "v3",
@@ -121,7 +133,7 @@ function init() {
         },
         bottomColor: {
             type: "v3",
-            value: new THREE.Vector3(.2, .216, .235)
+            value: new THREE.Vector3(.094, .102, .11)
         },
         radius: {
             type: "f",
@@ -151,6 +163,7 @@ function init() {
     scene.add(camera);
     scene.add(sphere);
     scene.add(torusMouse);
+    scene.add(overlayLabel);
 
 
     sphere.renderOrder = 1;
@@ -181,60 +194,71 @@ function init() {
     }
 
 
-    window.addEventListener('mousedown', onmousedown, false);
-    document.addEventListener('mousemove', onDocumentMouseMove, false);
-    window.addEventListener('mouseup', onmouseup, false);
+    document.addEventListener('mousedown', onmousedown, true);
+    document.addEventListener('mousemove', onDocumentMouseMove, true);
+    document.addEventListener('mouseup', onmouseup, true);
 
     function onDocumentMouseMove(e) {
-        // event.preventDefault();
-
         mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
         mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
 
-
+        if (state == 'measure' && line && !drawfinish) {
+            line.geometry.vertices[1] = point;
+            line.geometry.verticesNeedUpdate = true
+            overlayDiv.textContent = line.geometry.vertices[0].distanceTo(line.geometry.vertices[1]) + 'm';
+            overlayLabel.position.copy(point);
+        }
     }
 
     function onmouseup(e) {
-        if (idlePoint.distanceTo(point) < .01) {
-            var temp = [];
+        event.preventDefault();
 
-            for (let index = 0; index < dummyObject.children.length; index++) {
-                const element = dummyObject.children[index];
+        if (state != 'walk') return;
+        if (idlePoint && !isModalOpen)
+            if (idlePoint.distanceTo(point) < .01) {
+                var temp = [];
 
-                temp.push(element.position.distanceTo(point));
+                for (let index = 0; index < dummyObject.children.length; index++) {
+                    const element = dummyObject.children[index];
+
+                    temp.push(element.position.distanceTo(point));
+
+                }
+
+                currentSweep = sweeps[temp.indexOf(Math.min.apply(null, temp))]
+                moveToSweep();
 
             }
 
-            currentSweep = sweeps[temp.indexOf(Math.min.apply(null, temp))]
-            moveToSweep();
-
-        }
     }
 
     function onmousedown(e) {
-        // e.preventDefault();
-
-        if (INTERSECTED) {
+        e.preventDefault();
+        if (INTERSECTED && !isModalOpen) {
             currentSweep = sweeps[parseInt(INTERSECTED.name.replace('sweeps', ''))];
 
-            switch (state) {
-                case 'walk':
-                    moveToSweep();
-                    break;
-                case 'birdview':
-                    TweenMax.to(camera.position, 1.5, { x: currentSweep.position.x, y: currentSweep.position.z, z: -currentSweep.position.y })
-                    break;
+            if (state == 'walk')
+                moveToSweep();
 
-                default:
-                    break;
-            }
-        } else {
+            if (state == 'measure')
+                drawMeasurementLine();
+            else
+                overlayLabel.visible = false;
 
+
+        } else if (e.buttons == 1 && !lollipop) {
             idlePoint = point;
-
-
         }
-
+        if (e.buttons == 2)
+            createLollipop();
+        else if (lollipop) {
+            lollipop = null;
+            $('.modal').modal();
+            $('.modal').modal('open');
+            $('#lollipopInfo').val('');
+            $('#lollipopInfo').focus();
+            isModalOpen = true;
+        }
     }
 
 
@@ -261,8 +285,42 @@ function init() {
         });
     }
 
+
+
+    function createLollipop() {
+        var material = new THREE.LineBasicMaterial({
+            color: $('#candyColor').val(),
+        });
+
+
+        var geometry = new THREE.Geometry();
+        geometry.vertices.push(
+            new THREE.Vector3(0, 0, 0),
+            new THREE.Vector3(0, 0, 1)
+        );
+
+        lollipop = new THREE.Line(geometry, material);
+
+
+        var circle = new THREE.Mesh(new THREE.CircleGeometry(.1, 12), new THREE.MeshBasicMaterial({ color: $('#candyColor').val(), side: THREE.DoubleSide }));
+        circle.rotation.x = Math.PI / 2;
+        circle.position.z = 1.1;
+
+        lollipop.add(circle);
+        scene.add(lollipop);
+        lollipops.push({
+            info: '',
+            lollipop: lollipop
+        });
+
+
+
+    }
+
+
     function moveToSweep() {
 
+        $("body").css("cursor", "none");
 
         var texture = new THREE.CubeTextureLoader()
             .setPath('tex/' + currentSweep.sweep_uuid.replace(/-/g, '') + '/')
@@ -355,14 +413,38 @@ function init() {
 
     //listeners
 
+
+    $('#lollipopInfo').change((e) => {
+        lollipops[lollipops.length - 1].info = e.target.value;
+        console.error(lollipops);
+    });
+
+    $('#modal-close').click(() => {
+        lollipop = null;
+        isModalOpen = false;
+    });
+
+    $('#measure').click(() => {
+        $("body").css("cursor", "crosshair");
+        torusMouse.visible = false;
+        state = 'measure';
+
+    });
+
     $('#floor1').click(() => {
         renderer.localClippingEnabled = true;
+
     });
 
     $('#floor2').click(() => {
         renderer.localClippingEnabled = false;
+
+
     });
     $('#walk').click(() => {
+        $("body").css("cursor", "none");
+        torusMouse.visible = true;
+
         state = 'walk';
         orbitControls.enablePan = false;
         orbitControls.enableZoom = false;
@@ -378,6 +460,9 @@ function init() {
 
     });
     $('#mesh').click(() => {
+        $("body").css("cursor", "none");
+        torusMouse.visible = true;
+
         state = 'walk';
         orbitControls.enablePan = false;
         orbitControls.enableZoom = false;
@@ -396,15 +481,17 @@ function init() {
 
 
     $('#floorplan').click(() => {
+        $("body").css("cursor", "default");
 
         state = 'floorplan';
         dummyObject.visible = false;
+        orbitControls.enableRotate = false;
         changeCamBehaviour();
         orbitControls.target.copy({ x: 0, y: 0, z: 0 });
-        orbitControls.enableRotate = false;
         TweenMax.to(camera.position, 1.5,
             { x: 0, y: 20, z: 0 }
         );
+
 
     });
 
@@ -420,21 +507,52 @@ function init() {
     }
 
     $('#birdview').click(() => {
-        state = 'birdview'
+        state = 'birdview';
+        $("body").css("cursor", "default");
+        torusMouse.visible = false;
         dummyObject.visible = false;
         orbitControls.enableRotate = true;
-
         changeCamBehaviour();
-
         orbitControls.target.copy({ x: 0, y: 0, z: 0 });
-        TweenMax.to(camera.position, 1.5, { x: 11.678532561315652, y: 0.934736735869917, z: 8.169341739020679 });
+        TweenMax.to(camera.position, 1.5, { x: 2, y: 1, z: 8 });
 
+
+    });
+
+    $('#save').click(() => {
+        var content = JSON.stringify(lollipops);
+        var a = document.createElement("a");
+        var file = new Blob([content], { type: 'text / plain' });
+        a.href = URL.createObjectURL(file);
+        a.download = 'pinsData.json';
+        a.click();
 
     })
 
 }
 
 
+var drawfinish = false;
+function drawMeasurementLine() {
+
+    if (line)
+        drawfinish = !drawfinish;
+
+
+
+    if (drawfinish) return; else scene.remove(line);
+
+
+    points = [];
+    points.push(point);
+    points.push(point);
+    var material = new THREE.LineBasicMaterial({ color: 0x0000ff });
+    var geometry = new THREE.Geometry().setFromPoints(points);
+    line = new THREE.Line(geometry, material);
+    scene.add(line);
+    overlayLabel.visible = true;
+
+}
 
 function animate() {
 
@@ -465,6 +583,17 @@ function render() {
 
                 torusMouse.position.copy(point);
                 torusMouse.lookAt(normal);
+
+                if (lollipop) {
+                    lollipop.position.copy(point);
+                    lollipop.lookAt(normal);
+                    lollipop.children[0].lookAt(camera.position);
+                }
+                for (let index = 0; index < lollipops.length; index++) {
+                    const element = lollipops[index];
+                    element.lollipop.children[0].lookAt(camera.position);
+
+                }
 
 
             }
@@ -505,7 +634,11 @@ function render() {
     }
     if (state != 'walk')
         orbitControls.update();
+
+    labelRenderer.render(scene, camera);
+
     renderer.render(scene, camera);
+
 
 }
 

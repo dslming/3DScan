@@ -11,6 +11,8 @@ $(document).ready(() => {
         $(e.target).parent().addClass('active');
     });
 
+    $('.modal').modal();
+   
 
 
 })
