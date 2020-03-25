@@ -558,6 +558,7 @@ function init() {
 
 
     });
+    
 
     $('#save').click(() => {
         stateChanged = true;
