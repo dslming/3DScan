@@ -421,6 +421,7 @@ function init() {
 
 
     $('#lollipopInfo').change((e) => {
+        
         lollipops[lollipops.length - 1].info = e.target.value;
         console.error(lollipops);
     });
@@ -431,6 +432,10 @@ function init() {
     });
 
     $('#measure').click(() => {
+        stateChanged = true;
+        setTimeout(() => {
+            stateChanged = false;
+        }, 300);
         $("body").css("cursor", "crosshair");
         torusMouse.visible = false;
         state = 'measure';
@@ -438,11 +443,19 @@ function init() {
     });
 
     $('#floor1').click(() => {
+        stateChanged = true;
+        setTimeout(() => {
+            stateChanged = false;
+        }, 300);
         renderer.localClippingEnabled = true;
 
     });
 
     $('#floor2').click(() => {
+        stateChanged = true;
+        setTimeout(() => {
+            stateChanged = false;
+        }, 300);
         renderer.localClippingEnabled = false;
 
 
@@ -499,6 +512,11 @@ function init() {
 
 
     $('#floorplan').click(() => {
+        stateChanged = true;
+        setTimeout(() => {
+            stateChanged = false;
+        }, 300);
+
         $("body").css("cursor", "default");
 
         state = 'floorplan';
@@ -525,6 +543,10 @@ function init() {
     }
 
     $('#birdview').click(() => {
+        stateChanged = true;
+        setTimeout(() => {
+            stateChanged = false;
+        }, 300);
         state = 'birdview';
         $("body").css("cursor", "default");
         torusMouse.visible = false;
@@ -538,6 +560,10 @@ function init() {
     });
 
     $('#save').click(() => {
+        stateChanged = true;
+        setTimeout(() => {
+            stateChanged = false;
+        }, 300);
         var content = JSON.stringify(lollipops);
         var a = document.createElement("a");
         var file = new Blob([content], { type: 'text / plain' });
