@@ -36,7 +36,8 @@ var labelRenderer = new CSS2DRenderer();
 var overlayLabel = new CSS2DObject(overlayDiv);
 var lollipop;
 var lollipops = [];
-var isModalOpen = true;
+var isModalOpen = false;
+var stateChanged = false;
 
 
 init();
@@ -83,6 +84,8 @@ function init() {
     orbitControls.maxDistance = .001;
     orbitControls.enableZoom = false;
     orbitControls.enablePan = false;
+    orbitControls.target = new THREE.Vector3(1, -1.5, 1);
+
     // scene
     scene = new THREE.Scene();
 
@@ -194,9 +197,11 @@ function init() {
     }
 
 
-    document.addEventListener('mousedown', onmousedown, true);
+    document.addEventListener('mousedown', onmousedown, false);
     document.addEventListener('mousemove', onDocumentMouseMove, true);
     document.addEventListener('mouseup', onmouseup, true);
+
+
 
     function onDocumentMouseMove(e) {
         mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -226,13 +231,18 @@ function init() {
                 }
 
                 currentSweep = sweeps[temp.indexOf(Math.min.apply(null, temp))]
-                moveToSweep();
 
+                setTimeout(() => {
+                    if (!stateChanged) {
+                        moveToSweep();
+                    }
+                }, 100);
             }
 
     }
 
     function onmousedown(e) {
+
         e.preventDefault();
         if (INTERSECTED && !isModalOpen) {
             currentSweep = sweeps[parseInt(INTERSECTED.name.replace('sweeps', ''))];
@@ -319,6 +329,7 @@ function init() {
 
 
     function moveToSweep() {
+        orbitControls.enableRotate = false;
 
         $("body").css("cursor", "none");
 
@@ -338,21 +349,16 @@ function init() {
         sphereMat.uniforms['pano' + (textureSwap ? 1 : 0) + 'Map'].value = texture;
         sphereMat.uniforms['pano' + (textureSwap ? 1 : 0) + 'Matrix'].value.compose(currentSweep.position, fromVisionQuaternion(currentSweep.rotation), { x: 1, y: 1, z: 1 });
 
-        orbitControls.maxDistance = 22;
 
-        TweenMax.to(camera.position, 1.5, { x: currentSweep.position.x, y: currentSweep.position.z, z: -currentSweep.position.y })
+        TweenMax.to(orbitControls.target, 1.5, { x: currentSweep.position.x, y: currentSweep.position.z, z: -currentSweep.position.y })
 
         sphereMat.progress = (textureSwap ? 0 : 1);
         TweenMax.to(sphereMat.uniforms.progress, 1.5, { value: (textureSwap ? 1 : 0) });
 
-
-
         setTimeout(() => {
-            orbitControls.target.copy(camera.position);
-            orbitControls.maxDistance = .001;
             textureSwap = !textureSwap;
-
-        }, 1600);
+            orbitControls.enableRotate = true;
+        }, 1500);
 
 
     }
@@ -442,10 +448,14 @@ function init() {
 
     });
     $('#walk').click(() => {
+        stateChanged = true;
+        setTimeout(() => {
+            stateChanged = false;
+        }, 300);
+
         $("body").css("cursor", "none");
         torusMouse.visible = true;
 
-        state = 'walk';
         orbitControls.enablePan = false;
         orbitControls.enableZoom = false;
         orbitControls.maxDistance = .001;
@@ -456,14 +466,19 @@ function init() {
             element.opacity = 0;
         }
         sphere.visible = true;
-        moveToSweep();
+        if (state != 'walk')
+            moveToSweep();
+        state = 'walk';
 
     });
     $('#mesh').click(() => {
+        stateChanged = true;
+        setTimeout(() => {
+            stateChanged = false;
+        }, 300);
         $("body").css("cursor", "none");
         torusMouse.visible = true;
 
-        state = 'walk';
         orbitControls.enablePan = false;
         orbitControls.enableZoom = false;
         orbitControls.maxDistance = .001;
@@ -474,7 +489,10 @@ function init() {
             element.opacity = 1;
         }
         sphere.visible = false;
-        moveToSweep();
+        if (state != 'walk')
+            moveToSweep();
+        state = 'walk';
+
 
     });
 
@@ -489,7 +507,7 @@ function init() {
         changeCamBehaviour();
         orbitControls.target.copy({ x: 0, y: 0, z: 0 });
         TweenMax.to(camera.position, 1.5,
-            { x: 0, y: 20, z: 0 }
+            { x: 0, y: 20, z: 4 }
         );
 
 
@@ -632,8 +650,7 @@ function render() {
         INTERSECTED = null;
 
     }
-    if (state != 'walk')
-        orbitControls.update();
+    orbitControls.update();
 
     labelRenderer.render(scene, camera);
 
